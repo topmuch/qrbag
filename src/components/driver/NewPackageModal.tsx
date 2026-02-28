@@ -220,7 +220,8 @@ export default function NewPackageModal({
         setPickupCode(result.pickupCode);
         setStep(4);
         toast.success('Colis activé avec succès !');
-        onSuccess();
+        // Don't call onSuccess here - let user see the pickup code first
+        // onSuccess will be called when user clicks "Terminé"
       } else {
         toast.error(result.error || 'Erreur lors de l\'activation');
       }
@@ -260,6 +261,10 @@ Compagnie: Transport Express CI`;
   // Reset and close
   const handleClose = () => {
     onOpenChange(false);
+    // Call onSuccess to refresh data when closing
+    if (step === 4) {
+      onSuccess();
+    }
     setTimeout(() => {
       setStep(1);
       setQrCode('');
@@ -302,7 +307,7 @@ Compagnie: Transport Express CI`;
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-        onClick={handleClose}
+        onClick={step === 4 ? undefined : handleClose}
       >
         <motion.div
           initial={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -317,6 +322,7 @@ Compagnie: Transport Express CI`;
               <div className="flex items-center gap-3">
                 {step > 1 && step < 4 && (
                   <Button
+                    type="button"
                     variant="ghost"
                     size="icon"
                     onClick={prevStep}
@@ -339,6 +345,7 @@ Compagnie: Transport Express CI`;
                 </div>
               </div>
               <Button
+                type="button"
                 variant="ghost"
                 size="icon"
                 onClick={handleClose}
@@ -378,6 +385,7 @@ Compagnie: Transport Express CI`;
 
                 {/* Scan Button */}
                 <Button
+                  type="button"
                   onClick={() => setShowScanner(true)}
                   className="w-full h-16 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white shadow-lg shadow-violet-500/30"
                 >
@@ -409,6 +417,7 @@ Compagnie: Transport Express CI`;
                 </div>
 
                 <Button
+                  type="button"
                   onClick={nextStep}
                   disabled={!qrCode.trim()}
                   className="w-full h-14 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-lg font-semibold shadow-lg shadow-amber-500/30"
@@ -560,6 +569,7 @@ Compagnie: Transport Express CI`;
                         className="w-full h-48 object-cover rounded-xl"
                       />
                       <Button
+                        type="button"
                         variant="ghost"
                         size="icon"
                         onClick={() => {
@@ -603,6 +613,7 @@ Compagnie: Transport Express CI`;
                 {/* Actions */}
                 <div className="flex gap-3 pt-2">
                   <Button
+                    type="button"
                     variant="outline"
                     onClick={prevStep}
                     className="flex-1 h-12 bg-transparent border-white/20 text-white hover:bg-white/10"
@@ -610,6 +621,7 @@ Compagnie: Transport Express CI`;
                     Retour
                   </Button>
                   <Button
+                    type="button"
                     onClick={nextStep}
                     className="flex-1 h-12 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold shadow-lg shadow-amber-500/30"
                   >
@@ -659,6 +671,7 @@ Compagnie: Transport Express CI`;
 
                 <div className="flex gap-3">
                   <Button
+                    type="button"
                     variant="outline"
                     onClick={prevStep}
                     className="flex-1 h-12 bg-transparent border-white/20 text-white hover:bg-white/10"
@@ -666,6 +679,7 @@ Compagnie: Transport Express CI`;
                     Retour
                   </Button>
                   <Button
+                    type="button"
                     onClick={handleSubmit}
                     disabled={loading}
                     className="flex-1 h-12 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600 text-white font-semibold shadow-lg shadow-emerald-500/30"
@@ -711,6 +725,7 @@ Compagnie: Transport Express CI`;
 
                 <div className="space-y-3">
                   <Button
+                    type="button"
                     onClick={sendWhatsApp}
                     className="w-full h-14 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white text-lg font-semibold shadow-lg shadow-green-500/30"
                   >
@@ -719,6 +734,7 @@ Compagnie: Transport Express CI`;
                   </Button>
 
                   <Button
+                    type="button"
                     onClick={handleClose}
                     variant="outline"
                     className="w-full h-12 bg-transparent border-white/20 text-white hover:bg-white/10"
