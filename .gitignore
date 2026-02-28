@@ -43,6 +43,9 @@ prisma/dev.db-journal
 # uploads (user generated content)
 public/uploads/
 
+# secrets
+.github-token
+
 # vercel
 .vercel
 
