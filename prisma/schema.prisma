@@ -1,0 +1,185 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Bus {
+  id          String   @id
+  plateNumber String   @unique
+  model       String?
+  capacity    Int?
+  color       String?
+  year        Int?
+  companyId   String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  Company     Company  @relation(fields: [companyId], references: [id])
+  Trip        Trip[]
+}
+
+model Company {
+  id           String        @id
+  name         String
+  email        String        @unique
+  phone        String?
+  address      String?
+  city         String?
+  country      String?
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime
+  Bus          Bus[]
+  Driver       Driver[]
+  Package      Package[]
+  QRBatch      QRBatch[]
+  Route        Route[]
+  Subscription Subscription?
+  Trip         Trip[]
+  User         User[]
+}
+
+model Driver {
+  id            String    @id
+  userId        String    @unique
+  licenseNumber String?
+  licenseExpiry DateTime?
+  companyId     String
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime
+  Company       Company   @relation(fields: [companyId], references: [id])
+  User          User      @relation(fields: [userId], references: [id])
+  Trip          Trip[]
+}
+
+model Package {
+  id                String    @id
+  qrCode            String    @unique
+  status            String    @default("NON_ACTIVE")
+  senderName        String?
+  senderPhone       String?
+  recipientName     String?
+  recipientPhone    String?
+  recipientWhatsapp String?
+  pickupCode        String?
+  description       String?
+  weight            Float?
+  price             Float?
+  photo             String?
+  activatedAt       DateTime?
+  companyId         String?
+  tripId            String?
+  batchId           String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime
+  QRBatch           QRBatch?  @relation(fields: [batchId], references: [id])
+  Trip              Trip?     @relation(fields: [tripId], references: [id])
+  Company           Company?  @relation(fields: [companyId], references: [id])
+}
+
+model QRBatch {
+  id             String    @id
+  batchCode      String    @unique
+  quantity       Int
+  activatedCount Int       @default(0)
+  status         String    @default("PENDING")
+  companyId      String
+  createdAt      DateTime  @default(now())
+  Package        Package[]
+  Company        Company   @relation(fields: [companyId], references: [id])
+}
+
+model Route {
+  id            String   @id
+  name          String
+  origin        String
+  destination   String
+  distance      Float?
+  estimatedTime Int?
+  companyId     String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime
+  Company       Company  @relation(fields: [companyId], references: [id])
+  Trip          Trip[]
+}
+
+model Settings {
+  id               String @id
+  stickerPrice     Float  @default(200)
+  busOnlyPrice     Float  @default(50000)
+  colisOnlyPrice   Float  @default(30000)
+  packCompletPrice Float  @default(70000)
+}
+
+model Subscription {
+  id                String   @id
+  planType          String
+  monthlyFee        Float
+  stickerFee        Float    @default(200)
+  activatedStickers Int      @default(0)
+  startDate         DateTime @default(now())
+  endDate           DateTime
+  status            String   @default("ACTIVE")
+  companyId         String   @unique
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime
+  Company           Company  @relation(fields: [companyId], references: [id])
+}
+
+model Trip {
+  id              String     @id
+  status          String     @default("SCHEDULED")
+  departureTime   DateTime
+  actualDeparture DateTime?
+  arrivalTime     DateTime?
+  actualArrival   DateTime?
+  passengers      Int        @default(0)
+  trackingCode    String     @unique
+  currentLat      Float?
+  currentLng      Float?
+  notes           String?
+  busId           String
+  driverId        String
+  routeId         String
+  companyId       String
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime
+  Package         Package[]
+  Company         Company    @relation(fields: [companyId], references: [id])
+  Route           Route      @relation(fields: [routeId], references: [id])
+  Driver          Driver     @relation(fields: [driverId], references: [id])
+  Bus             Bus        @relation(fields: [busId], references: [id])
+  TripScan        TripScan[]
+}
+
+model TripScan {
+  id        String   @id
+  type      String
+  timestamp DateTime @default(now())
+  latitude  Float?
+  longitude Float?
+  notes     String?
+  tripId    String
+  createdAt DateTime @default(now())
+  Trip      Trip     @relation(fields: [tripId], references: [id])
+}
+
+model User {
+  id        String   @id
+  email     String   @unique
+  name      String
+  phone     String?
+  password  String
+  role      String   @default("OWNER")
+  companyId String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  Driver    Driver?
+  Company   Company? @relation(fields: [companyId], references: [id])
+}
