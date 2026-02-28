@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Building2 } from 'lucide-react';
+import { Building2, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { toast, Toaster } from 'sonner';
 
 interface CreateCompanyModalProps {
   isOpen: boolean;
@@ -52,6 +53,7 @@ export default function CreateCompanyModal({
   onSuccess 
 }: CreateCompanyModalProps) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -79,12 +81,33 @@ export default function CreateCompanyModal({
     }
   };
 
-  const handleSubmit = async () => {
-    if (!formData.name || !formData.email || !formData.country) {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validation
+    if (!formData.name.trim()) {
+      setError('Le nom de la compagnie est requis');
+      toast.error('Le nom de la compagnie est requis');
+      return;
+    }
+    
+    if (!formData.email.trim()) {
+      setError('L\'email est requis');
+      toast.error('L\'email est requis');
       return;
     }
 
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setError('Format d\'email invalide');
+      toast.error('Format d\'email invalide');
+      return;
+    }
+
+    setError(null);
     setLoading(true);
+
     try {
       const response = await fetch('/api/admin/companies', {
         method: 'POST',
@@ -92,160 +115,205 @@ export default function CreateCompanyModal({
         body: JSON.stringify(formData)
       });
 
-      if (response.ok) {
-        onSuccess();
-        onClose();
-        setFormData({
-          name: '',
-          email: '',
-          phone: '',
-          city: '',
-          country: 'Côte d\'Ivoire',
-          planType: 'PACK_COMPLET'
-        });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erreur lors de la création');
       }
-    } catch (error) {
+
+      // Success
+      toast.success(`Compagnie "${formData.name}" créée avec succès !`, {
+        description: `Abonnement ${plans.find(p => p.value === formData.planType)?.label}`
+      });
+      
+      // Reset form
+      setFormData({
+        name: '',
+        email: '',
+        phone: '',
+        city: '',
+        country: 'Côte d\'Ivoire',
+        planType: 'PACK_COMPLET'
+      });
+      
+      onSuccess();
+      onClose();
+      
+    } catch (error: any) {
       console.error('Error creating company:', error);
+      setError(error.message);
+      toast.error(error.message || 'Erreur lors de la création de la compagnie');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleClose = () => {
+    if (!loading) {
+      setError(null);
+      onClose();
+    }
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg bg-white">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-gray-900">
-            <div className="w-8 h-8 rounded-lg bg-[#5DADE2]/10 flex items-center justify-center">
-              <Building2 className="w-4 h-4 text-[#5DADE2]" />
-            </div>
-            Nouvelle Compagnie
-          </DialogTitle>
-          <DialogDescription className="text-gray-500">
-            Créez une nouvelle compagnie de transport
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Toaster position="top-center" richColors />
+      <Dialog open={isOpen} onOpenChange={handleClose}>
+        <DialogContent className="sm:max-w-lg bg-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-gray-900">
+              <div className="w-8 h-8 rounded-lg bg-[#5DADE2]/10 flex items-center justify-center">
+                <Building2 className="w-4 h-4 text-[#5DADE2]" />
+              </div>
+              Nouvelle Compagnie
+            </DialogTitle>
+            <DialogDescription className="text-gray-500">
+              Créez une nouvelle compagnie de transport
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="name" className="text-gray-700">Nom de la compagnie *</Label>
-            <Input
-              id="name"
-              placeholder="Ex: Transport Express Sénégal"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="border-gray-200 focus:border-[#FF9F40] focus:ring-[#FF9F40]"
-            />
-          </div>
+          <form onSubmit={handleSubmit} className="space-y-4 py-4">
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                {error}
+              </div>
+            )}
 
-          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-gray-700">Email *</Label>
+              <Label htmlFor="name" className="text-gray-700">Nom de la compagnie *</Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="contact@company.com"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                id="name"
+                placeholder="Ex: Transport Express Sénégal"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="border-gray-200 focus:border-[#FF9F40] focus:ring-[#FF9F40]"
+                required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone" className="text-gray-700">Téléphone</Label>
-              <Input
-                id="phone"
-                placeholder="+221 77 000 00 00"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="border-gray-200 focus:border-[#FF9F40] focus:ring-[#FF9F40]"
-              />
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="city" className="text-gray-700">Ville</Label>
-              <Input
-                id="city"
-                placeholder="Dakar"
-                value={formData.city}
-                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                className="border-gray-200 focus:border-[#FF9F40] focus:ring-[#FF9F40]"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-gray-700">Email *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="contact@company.com"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="border-gray-200 focus:border-[#FF9F40] focus:ring-[#FF9F40]"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone" className="text-gray-700">Téléphone</Label>
+                <Input
+                  id="phone"
+                  placeholder="+221 77 000 00 00"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className="border-gray-200 focus:border-[#FF9F40] focus:ring-[#FF9F40]"
+                />
+              </div>
             </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="city" className="text-gray-700">Ville</Label>
+                <Input
+                  id="city"
+                  placeholder="Dakar"
+                  value={formData.city}
+                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                  className="border-gray-200 focus:border-[#FF9F40] focus:ring-[#FF9F40]"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="country" className="text-gray-700">Pays</Label>
+                <Select
+                  value={formData.country}
+                  onValueChange={(value) => setFormData({ ...formData, country: value })}
+                >
+                  <SelectTrigger className="border-gray-200 focus:border-[#FF9F40]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {countries.map((country) => (
+                      <SelectItem key={country} value={country}>
+                        {country}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             <div className="space-y-2">
-              <Label htmlFor="country" className="text-gray-700">Pays</Label>
+              <Label htmlFor="plan" className="text-gray-700">Forfait</Label>
               <Select
-                value={formData.country}
-                onValueChange={(value) => setFormData({ ...formData, country: value })}
+                value={formData.planType}
+                onValueChange={(value) => setFormData({ ...formData, planType: value })}
               >
                 <SelectTrigger className="border-gray-200 focus:border-[#FF9F40]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {countries.map((country) => (
-                    <SelectItem key={country} value={country}>
-                      {country}
+                  {plans.map((plan) => (
+                    <SelectItem key={plan.value} value={plan.value}>
+                      <span style={{ color: plan.color }}>●</span> {plan.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="plan" className="text-gray-700">Forfait</Label>
-            <Select
-              value={formData.planType}
-              onValueChange={(value) => setFormData({ ...formData, planType: value })}
+            {/* Summary */}
+            <div 
+              className="rounded-lg p-4 border"
+              style={{ 
+                backgroundColor: `${getPlanColor(formData.planType)}10`,
+                borderColor: `${getPlanColor(formData.planType)}30`
+              }}
             >
-              <SelectTrigger className="border-gray-200 focus:border-[#FF9F40]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {plans.map((plan) => (
-                  <SelectItem key={plan.value} value={plan.value}>
-                    <span style={{ color: plan.color }}>●</span> {plan.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              <h4 className="font-medium text-gray-900 mb-2">Abonnement mensuel</h4>
+              <p 
+                className="text-2xl font-bold"
+                style={{ color: getPlanColor(formData.planType) }}
+              >
+                {getPlanPrice(formData.planType)}
+              </p>
+              <p className="text-sm text-gray-500 mt-1">
+                + 200 FCFA par sticker activé
+              </p>
+            </div>
 
-          {/* Summary */}
-          <div 
-            className="rounded-lg p-4 border"
-            style={{ 
-              backgroundColor: `${getPlanColor(formData.planType)}10`,
-              borderColor: `${getPlanColor(formData.planType)}30`
-            }}
-          >
-            <h4 className="font-medium text-gray-900 mb-2">Abonnement mensuel</h4>
-            <p 
-              className="text-2xl font-bold"
-              style={{ color: getPlanColor(formData.planType) }}
-            >
-              {getPlanPrice(formData.planType)}
-            </p>
-            <p className="text-sm text-gray-500 mt-1">
-              + 200 FCFA par sticker activé
-            </p>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-3">
-          <Button variant="outline" onClick={onClose} className="border-gray-200">
-            Annuler
-          </Button>
-          <Button
-            className="bg-[#FF9F40] hover:bg-[#E67E00] text-white"
-            onClick={handleSubmit}
-            disabled={loading || !formData.name || !formData.email}
-          >
-            {loading ? 'Création...' : '✓ Créer la compagnie'}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={handleClose} 
+                className="border-gray-200"
+                disabled={loading}
+              >
+                Annuler
+              </Button>
+              <Button
+                type="submit"
+                className="bg-[#FF9F40] hover:bg-[#E67E00] text-white min-w-[150px]"
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Création...
+                  </>
+                ) : (
+                  '✓ Créer la compagnie'
+                )}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

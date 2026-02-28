@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { BatchStatus } from '@prisma/client';
+import { randomUUID } from 'crypto';
 
 // Helper to generate unique QR code
 function generateQRCode(batchCode: string, index: number): string {
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       const batch = await db.qRBatch.findUnique({
         where: { id: batchId },
         include: {
-          company: {
+          Company: {
             select: {
               id: true,
               name: true,
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
               country: true
             }
           },
-          packages: {
+          Package: {
             orderBy: {
               qrCode: 'asc'
             }
@@ -50,30 +50,36 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      return NextResponse.json(batch);
+      // Transform to match frontend expectations
+      return NextResponse.json({
+        ...batch,
+        company: batch.Company,
+        packages: batch.Package
+      });
     }
 
     // Get all batches
     const batches = await db.qRBatch.findMany({
       include: {
-        company: {
+        Company: {
           select: {
             id: true,
             name: true
           }
         },
-        _count: {
-          select: {
-            packages: true
-          }
-        }
+        Package: true
       },
       orderBy: {
         createdAt: 'desc'
       }
     });
 
-    return NextResponse.json(batches);
+    // Transform to match frontend expectations
+    return NextResponse.json(batches.map(b => ({
+      ...b,
+      company: b.Company,
+      _count: { packages: b.Package.length }
+    })));
   } catch (error) {
     console.error('Get QR batches error:', error);
     return NextResponse.json(
@@ -87,11 +93,18 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { companyId, quantity } = body;
+    const { companyId, quantity, notes } = body;
 
     if (!companyId || !quantity || quantity < 1) {
       return NextResponse.json(
         { error: 'ID compagnie et quantité sont requis' },
+        { status: 400 }
+      );
+    }
+
+    if (quantity > 1000) {
+      return NextResponse.json(
+        { error: 'La quantité maximale est de 1000 QR codes' },
         { status: 400 }
       );
     }
@@ -124,12 +137,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Create batch
+    const batchId = randomUUID();
     const batch = await db.qRBatch.create({
       data: {
+        id: batchId,
         batchCode,
         quantity,
         activatedCount: 0,
-        status: BatchStatus.PENDING,
+        status: 'PENDING',
         companyId
       }
     });
@@ -138,10 +153,12 @@ export async function POST(request: NextRequest) {
     const packagesData = [];
     for (let i = 1; i <= quantity; i++) {
       packagesData.push({
+        id: randomUUID(),
         qrCode: generateQRCode(batchCode, i),
         status: 'NON_ACTIVE',
         companyId,
-        batchId: batch.id
+        batchId: batch.id,
+        updatedAt: new Date()
       });
     }
 
@@ -169,10 +186,10 @@ export async function POST(request: NextRequest) {
       },
       codes: createdPackages.map(p => p.qrCode)
     }, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Create QR batch error:', error);
     return NextResponse.json(
-      { error: 'Erreur lors de la création du lot QR' },
+      { error: 'Erreur lors de la création du lot QR', details: error?.message || 'Unknown error' },
       { status: 500 }
     );
   }

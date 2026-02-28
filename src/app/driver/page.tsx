@@ -942,6 +942,57 @@ export default function DriverApp() {
         </div>
       </nav>
 
+      {/* Notifications Modal */}
+      <Dialog open={showNotifications} onOpenChange={setShowNotifications}>
+        <DialogContent className="sm:max-w-md bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 border-white/20 text-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                <Bell className="w-4 h-4 text-amber-400" />
+              </div>
+              Notifications
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-3 py-2">
+            {[
+              { id: 1, type: 'info', title: 'Nouveau colis assigné', message: '1 nouveau colis a été ajouté à votre voyage', time: '2 min', icon: Package, color: 'bg-blue-500' },
+              { id: 2, type: 'alert', title: 'Rappel de pause', message: 'N\'oubliez pas de faire une pause de 15 min', time: '15 min', icon: Clock, color: 'bg-amber-500' },
+              { id: 3, type: 'success', title: 'Voyage créé', message: 'Votre voyage Abidjan - Yamoussoukro a été créé', time: '1h', icon: CheckCircle2, color: 'bg-green-500' },
+            ].map((notif) => {
+              const Icon = notif.icon;
+              return (
+                <div 
+                  key={notif.id} 
+                  className="backdrop-blur-sm bg-white/5 border border-white/10 rounded-xl p-4 hover:bg-white/10 transition-colors cursor-pointer"
+                >
+                  <div className="flex gap-3">
+                    <div className={cn("w-10 h-10 rounded-full flex items-center justify-center", notif.color)}>
+                      <Icon className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <p className="font-medium text-white">{notif.title}</p>
+                        <span className="text-xs text-white/40">{notif.time}</span>
+                      </div>
+                      <p className="text-sm text-white/60 mt-0.5">{notif.message}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            
+            <Button 
+              variant="outline" 
+              className="w-full border-white/20 text-white hover:bg-white/10 mt-2"
+              onClick={() => setShowNotifications(false)}
+            >
+              Fermer
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Checkpoint QR Scanner Modal */}
       <QRScanner
         open={showCheckpointScanner}

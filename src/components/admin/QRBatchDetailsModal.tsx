@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { QrCode, X, Copy, Check, Download, Printer } from 'lucide-react';
+import { QrCode, X, Copy, Check, Download, Printer, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { toast } from 'sonner';
 
 interface QRBatchDetailsModalProps {
   isOpen: boolean;
@@ -52,6 +53,8 @@ export default function QRBatchDetailsModal({
   const [batch, setBatch] = useState<BatchDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [printing, setPrinting] = useState(false);
 
   useEffect(() => {
     if (isOpen && batchId) {
@@ -71,6 +74,7 @@ export default function QRBatchDetailsModal({
       }
     } catch (error) {
       console.error('Error fetching batch details:', error);
+      toast.error('Erreur lors du chargement des détails');
     } finally {
       setLoading(false);
     }
@@ -79,7 +83,194 @@ export default function QRBatchDetailsModal({
   const copyToClipboard = (code: string) => {
     navigator.clipboard.writeText(code);
     setCopiedCode(code);
+    toast.success('Code copié!');
     setTimeout(() => setCopiedCode(null), 2000);
+  };
+
+  const downloadCSV = () => {
+    if (!batch) return;
+    
+    setDownloading(true);
+    try {
+      // Create CSV content
+      const headers = ['Code QR', 'Statut', 'Date Activation', 'Expéditeur', 'Destinataire'];
+      const rows = batch.packages.map(pkg => [
+        pkg.qrCode,
+        pkg.status === 'NON_ACTIVE' ? 'Non activé' : 
+        pkg.status === 'ACTIVE' ? 'Actif' : 
+        pkg.status === 'IN_TRANSIT' ? 'En transit' : 'Livré',
+        pkg.activatedAt ? new Date(pkg.activatedAt).toLocaleDateString('fr-FR') : '-',
+        pkg.senderName || '-',
+        pkg.recipientName || '-'
+      ]);
+      
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+      ].join('\n');
+      
+      // Create and download file
+      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${batch.batchCode}_qr_codes.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      toast.success('Fichier CSV téléchargé!');
+    } catch (error) {
+      console.error('Error downloading CSV:', error);
+      toast.error('Erreur lors du téléchargement');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const printStickers = () => {
+    if (!batch) return;
+    
+    setPrinting(true);
+    try {
+      // Create print window with stickers
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        toast.error('Veuillez autoriser les fenêtres pop-up pour imprimer');
+        setPrinting(false);
+        return;
+      }
+      
+      const stickersPerPage = 10;
+      const pages = Math.ceil(batch.packages.length / stickersPerPage);
+      
+      let stickersHTML = '';
+      batch.packages.forEach((pkg, index) => {
+        const statusText = pkg.status === 'NON_ACTIVE' ? "En attente d'activation" : 'Activé';
+        stickersHTML += `
+          <div class="sticker">
+            <div class="sticker-header">
+              <div class="company-name">${batch.company.name}</div>
+              <div class="qr-label">QR BAG</div>
+            </div>
+            <div class="qr-code">${pkg.qrCode}</div>
+            <div class="sticker-footer">
+              <div>Scanner pour suivre votre colis</div>
+              <div class="status">${statusText}</div>
+            </div>
+          </div>
+        `;
+      });
+      
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Stickers ${batch.batchCode}</title>
+          <style>
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+            }
+            body {
+              font-family: Arial, sans-serif;
+              padding: 10mm;
+            }
+            .page {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 5mm;
+              page-break-after: always;
+            }
+            .page:last-child {
+              page-break-after: auto;
+            }
+            .sticker {
+              width: 70mm;
+              height: 35mm;
+              border: 2px solid #333;
+              border-radius: 5px;
+              padding: 3mm;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+              background: white;
+            }
+            .sticker-header {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              border-bottom: 1px solid #ccc;
+              padding-bottom: 2mm;
+            }
+            .company-name {
+              font-size: 10px;
+              font-weight: bold;
+              color: #333;
+            }
+            .qr-label {
+              font-size: 12px;
+              font-weight: bold;
+              color: #FF6B00;
+            }
+            .qr-code {
+              font-family: 'Courier New', monospace;
+              font-size: 14px;
+              font-weight: bold;
+              text-align: center;
+              padding: 3mm 0;
+              color: #000;
+              letter-spacing: 1px;
+            }
+            .sticker-footer {
+              font-size: 8px;
+              text-align: center;
+              color: #666;
+              border-top: 1px solid #ccc;
+              padding-top: 2mm;
+            }
+            .status {
+              margin-top: 1mm;
+              color: #888;
+            }
+            @media print {
+              body {
+                padding: 0;
+              }
+              .sticker {
+                border: 2px solid #000;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="page">
+            ${stickersHTML}
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              window.onafterprint = function() {
+                window.close();
+              };
+            };
+          </script>
+        </body>
+        </html>
+      `);
+      
+      printWindow.document.close();
+      toast.success('Fenêtre d\'impression ouverte');
+    } catch (error) {
+      console.error('Error printing stickers:', error);
+      toast.error('Erreur lors de l\'impression');
+    } finally {
+      setPrinting(false);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -194,12 +385,28 @@ export default function QRBatchDetailsModal({
 
             {/* Actions */}
             <div className="flex flex-wrap gap-3 justify-end pt-4">
-              <Button variant="outline">
-                <Download className="w-4 h-4 mr-2" />
+              <Button 
+                variant="outline" 
+                onClick={downloadCSV}
+                disabled={downloading}
+              >
+                {downloading ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4 mr-2" />
+                )}
                 Télécharger CSV
               </Button>
-              <Button variant="outline">
-                <Printer className="w-4 h-4 mr-2" />
+              <Button 
+                variant="outline"
+                onClick={printStickers}
+                disabled={printing}
+              >
+                {printing ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Printer className="w-4 h-4 mr-2" />
+                )}
                 Imprimer stickers
               </Button>
               <Button

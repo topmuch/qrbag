@@ -21,7 +21,9 @@ import CreateTripModal from '@/components/owner/CreateTripModal';
 import CreateDriverModal from '@/components/owner/CreateDriverModal';
 import CreateBusModal from '@/components/owner/CreateBusModal';
 import CreateRouteModal from '@/components/owner/CreateRouteModal';
+import RouteCard from '@/components/owner/RouteCard';
 import TripDetailsModal from '@/components/owner/TripDetailsModal';
+import OwnerTripsMonitoring from '@/components/owner/OwnerTripsMonitoring';
 import SettingsModal from '@/components/admin/SettingsModal';
 import {
   AlertDialog,
@@ -659,42 +661,10 @@ export default function OwnerDashboard() {
             {/* TRIPS PAGE */}
             {activeNav === 'trips' && (
               <motion.div key="trips" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
-                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                  <div className="flex gap-2 flex-wrap">
-                    {['Tous', 'En cours', 'Programmés', 'Terminés'].map((status) => (
-                      <Button 
-                        key={status} 
-                        variant={tripStatusFilter === status ? 'default' : 'outline'}
-                        className={tripStatusFilter === status ? 'bg-[#10B981] text-white' : ''}
-                        onClick={() => setTripStatusFilter(status)}
-                      >
-                        {status}
-                      </Button>
-                    ))}
-                  </div>
-                  <Button className="bg-[#10B981] hover:bg-[#059669] text-white" onClick={() => setShowCreateTrip(true)}>
-                    <Plus className="w-4 h-4 mr-2" />Nouveau voyage
-                  </Button>
-                </div>
-
-                {filteredTrips.length > 0 ? (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {filteredTrips.map((trip: any) => (
-                      <TripCard 
-                        key={trip.id} 
-                        trip={trip} 
-                        isActive={trip.status === 'IN_PROGRESS'} 
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <Card className="bg-gray-50 border border-gray-200">
-                    <CardContent className="p-8 text-center">
-                      <Truck className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                      <p className="text-gray-500">Aucun voyage trouvé</p>
-                    </CardContent>
-                  </Card>
-                )}
+                <OwnerTripsMonitoring 
+                  companyId={data.company.id}
+                  onCreateTrip={() => setShowCreateTrip(true)}
+                />
               </motion.div>
             )}
 
@@ -841,61 +811,74 @@ export default function OwnerDashboard() {
             {/* ROUTES PAGE */}
             {activeNav === 'routes' && (
               <motion.div key="routes" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
+                {/* Header */}
                 <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                  <div className="relative flex-1 max-w-md">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <Input 
-                      placeholder="Rechercher une route..." 
-                      className="pl-10 border-gray-200" 
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900">Gestion des Routes</h2>
+                    <p className="text-sm text-gray-500">
+                      Configurez vos itinéraires avec checkpoints (Départ, Pauses, Arrivée)
+                    </p>
                   </div>
                   <Button className="bg-[#8B5CF6] hover:bg-[#7C3AED] text-white" onClick={() => setShowCreateRoute(true)}>
                     <Plus className="w-4 h-4 mr-2" />Nouvelle route
                   </Button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredRoutes.map((route: any) => (
-                    <Card key={route.id} className="bg-white shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer">
-                      <CardContent className="p-5">
-                        <div className="flex items-center gap-3 mb-3">
-                          <div className="w-10 h-10 rounded-lg bg-[#8B5CF6]/10 flex items-center justify-center">
-                            <Route className="w-5 h-5 text-[#8B5CF6]" />
-                          </div>
-                          <p className="font-semibold text-gray-900">{route.name}</p>
-                        </div>
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-gray-500">De</span>
-                            <span className="text-gray-900">{route.origin}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-500">À</span>
-                            <span className="text-gray-900">{route.destination}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-500">Distance</span>
-                            <span className="text-gray-900">{route.distance ? `${route.distance} km` : 'N/A'}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-500">Durée estimée</span>
-                            <span className="text-gray-900">
-                              {route.estimatedTime ? `${Math.floor(route.estimatedTime / 60)}h${route.estimatedTime % 60}` : 'N/A'}
-                            </span>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                {/* Search */}
+                <div className="relative max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input 
+                    placeholder="Rechercher une route..." 
+                    className="pl-10 border-gray-200" 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
                 </div>
 
-                {filteredRoutes.length === 0 && (
+                {/* Routes Grid */}
+                {filteredRoutes.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {filteredRoutes.map((route: any) => (
+                      <RouteCard 
+                        key={route.id} 
+                        route={route}
+                        onRefresh={fetchData}
+                      />
+                    ))}
+                  </div>
+                ) : (
                   <Card className="bg-gray-50 border border-gray-200">
                     <CardContent className="p-8 text-center">
-                      <Route className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                      <p className="text-gray-500">Aucune route trouvée</p>
+                      <div className="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center mx-auto mb-4">
+                        <Route className="w-8 h-8 text-purple-400" />
+                      </div>
+                      <h3 className="font-semibold text-gray-900 mb-2">Aucune route configurée</h3>
+                      <p className="text-gray-500 mb-4">
+                        Créez votre première route pour commencer à planifier des voyages
+                      </p>
+                      <Button className="bg-[#8B5CF6] hover:bg-[#7C3AED] text-white" onClick={() => setShowCreateRoute(true)}>
+                        <Plus className="w-4 h-4 mr-2" />Créer une route
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Helper Card */}
+                {filteredRoutes.length > 0 && (
+                  <Card className="bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200">
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
+                          <span className="text-purple-600">💡</span>
+                        </div>
+                        <div>
+                          <h4 className="font-medium text-gray-900">Configuration des checkpoints</h4>
+                          <p className="text-sm text-gray-600 mt-1">
+                            Chaque route doit avoir un point de départ et d'arrivée. Ajoutez des pauses intermédiaires 
+                            (repos, repas, carburant) pour un meilleur suivi des voyages.
+                          </p>
+                        </div>
+                      </div>
                     </CardContent>
                   </Card>
                 )}

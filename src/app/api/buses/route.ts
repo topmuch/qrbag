@@ -6,7 +6,21 @@ import { randomUUID } from 'crypto';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const companyId = searchParams.get('companyId') || 'demo-company-1';
+    let companyId = searchParams.get('companyId');
+    
+    // If no company ID or demo ID, get the first company
+    if (!companyId || companyId === 'demo-company-1') {
+      const firstCompany = await db.company.findFirst({
+        orderBy: { createdAt: 'asc' }
+      });
+      if (firstCompany) {
+        companyId = firstCompany.id;
+      }
+    }
+
+    if (!companyId) {
+      return NextResponse.json(getDemoBuses());
+    }
 
     const buses = await db.bus.findMany({
       where: { companyId },

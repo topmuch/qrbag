@@ -7,7 +7,20 @@ export async function GET(request: Request) {
     // For demo, we'll use company ID from query param
     // In production, this would come from authenticated session
     const { searchParams } = new URL(request.url);
-    const companyId = searchParams.get('companyId') || 'demo-company-1';
+    let companyId = searchParams.get('companyId');
+    
+    // If no company ID provided, get the first company from database
+    if (!companyId || companyId === 'demo-company-1') {
+      const firstCompany = await db.company.findFirst({
+        orderBy: { createdAt: 'asc' }
+      });
+      if (firstCompany) {
+        companyId = firstCompany.id;
+      } else {
+        // No companies exist, return demo data
+        return NextResponse.json(getDemoDashboardData());
+      }
+    }
     
     // Get company info
     const company = await db.company.findUnique({
@@ -45,9 +58,17 @@ export async function GET(request: Request) {
       }
     });
 
-    // Get routes
+    // Get routes with checkpoints
     const routes = await db.route.findMany({
-      where: { companyId }
+      where: { companyId },
+      include: {
+        Checkpoints: {
+          orderBy: { order: 'asc' }
+        },
+        _count: {
+          select: { Trip: true }
+        }
+      }
     });
 
     // Get trips (active and scheduled)
@@ -173,7 +194,20 @@ export async function GET(request: Request) {
         origin: r.origin,
         destination: r.destination,
         distance: r.distance,
-        estimatedTime: r.estimatedTime
+        estimatedTime: r.estimatedTime,
+        checkpoints: r.Checkpoints.map(cp => ({
+          id: cp.id,
+          name: cp.name,
+          type: cp.type,
+          order: cp.order,
+          recommendedDuration: cp.recommendedDuration,
+          latitude: cp.latitude,
+          longitude: cp.longitude,
+          notes: cp.notes
+        })),
+        _count: {
+          trips: r._count.Trip
+        }
       })),
       activeTrips: activeTrips.map(t => formatTrip(t)),
       scheduledTrips: scheduledTrips.map(t => formatTrip(t)),
@@ -284,9 +318,50 @@ function getDemoDashboardData() {
       { id: 'driver-2', name: 'Mamadou Diallo', email: 'driver2@transport-express.ci', phone: '+225 07 00 00 03', licenseNumber: 'CI-11111-2024', licenseExpiry: '2027-03-15', isActive: true }
     ],
     routes: [
-      { id: 'route-1', name: 'Abidjan - Yamoussoukro', origin: 'Abidjan', destination: 'Yamoussoukro', distance: 250, estimatedTime: 240 },
-      { id: 'route-2', name: 'Abidjan - Bouaké', origin: 'Abidjan', destination: 'Bouaké', distance: 350, estimatedTime: 360 },
-      { id: 'route-3', name: 'Abidjan - Ouaga', origin: 'Abidjan', destination: 'Ouagadougou', distance: 850, estimatedTime: 1080 }
+      { 
+        id: 'route-1', 
+        name: 'Abidjan - Yamoussoukro', 
+        origin: 'Abidjan', 
+        destination: 'Yamoussoukro', 
+        distance: 250, 
+        estimatedTime: 240,
+        checkpoints: [
+          { id: 'cp-1', name: 'Gare routière Abidjan', type: 'DEPART', order: 1, recommendedDuration: null, latitude: 5.3599, longitude: -4.0083, notes: null },
+          { id: 'cp-2', name: 'Station Total Sikensi', type: 'PAUSE', order: 2, recommendedDuration: 20, latitude: null, longitude: null, notes: 'CARBURANT' },
+          { id: 'cp-3', name: 'Gare routière Yamoussoukro', type: 'ARRIVAL', order: 3, recommendedDuration: null, latitude: 6.8276, longitude: -5.2893, notes: null }
+        ],
+        _count: { trips: 12 }
+      },
+      { 
+        id: 'route-2', 
+        name: 'Abidjan - Bouaké', 
+        origin: 'Abidjan', 
+        destination: 'Bouaké', 
+        distance: 350, 
+        estimatedTime: 360,
+        checkpoints: [
+          { id: 'cp-4', name: 'Gare routière Abidjan', type: 'DEPART', order: 1, recommendedDuration: null, latitude: 5.3599, longitude: -4.0083, notes: null },
+          { id: 'cp-5', name: 'Relais Agboville', type: 'PAUSE', order: 2, recommendedDuration: 30, latitude: null, longitude: null, notes: 'REPAS' },
+          { id: 'cp-6', name: 'Station Total Tiassalé', type: 'PAUSE', order: 3, recommendedDuration: 15, latitude: null, longitude: null, notes: 'CARBURANT' },
+          { id: 'cp-7', name: 'Gare routière Bouaké', type: 'ARRIVAL', order: 4, recommendedDuration: null, latitude: 7.6892, longitude: -5.0708, notes: null }
+        ],
+        _count: { trips: 8 }
+      },
+      { 
+        id: 'route-3', 
+        name: 'Abidjan - Ouaga', 
+        origin: 'Abidjan', 
+        destination: 'Ouagadougou', 
+        distance: 850, 
+        estimatedTime: 1080,
+        checkpoints: [
+          { id: 'cp-8', name: 'Gare routière Abidjan', type: 'DEPART', order: 1, recommendedDuration: null, latitude: 5.3599, longitude: -4.0083, notes: null },
+          { id: 'cp-9', name: 'Pause Bouaké', type: 'PAUSE', order: 2, recommendedDuration: 45, latitude: null, longitude: null, notes: 'REPAS' },
+          { id: 'cp-10', name: 'Frontière CI/Ghana', type: 'PAUSE', order: 3, recommendedDuration: 30, latitude: null, longitude: null, notes: 'CONTROLE' },
+          { id: 'cp-11', name: 'Station Ouagadougou', type: 'ARRIVAL', order: 4, recommendedDuration: null, latitude: 12.3686, longitude: -1.5275, notes: null }
+        ],
+        _count: { trips: 3 }
+      }
     ],
     activeTrips: [
       {

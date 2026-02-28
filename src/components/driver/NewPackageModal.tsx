@@ -128,9 +128,18 @@ export default function NewPackageModal({
 
   // Handle form submission
   const handleSubmit = async () => {
-    if (!validateStep(2)) return;
+    if (!validateStep(2)) {
+      console.log('[MODAL] Validation failed');
+      return;
+    }
     
     setLoading(true);
+    console.log('[MODAL] ===== STARTING PACKAGE ACTIVATION =====');
+    console.log('[MODAL] QR Code:', qrCode);
+    console.log('[MODAL] TripId:', tripId);
+    console.log('[MODAL] Sender:', formData.senderName, formData.senderPhone);
+    console.log('[MODAL] Recipient:', formData.recipientName, formData.recipientPhone);
+    console.log('[MODAL] Photo:', photo ? `${photo.name} (${photo.size} bytes, type: ${photo.type})` : 'NO PHOTO');
     
     try {
       const formDataToSend = new FormData();
@@ -143,7 +152,7 @@ export default function NewPackageModal({
       formDataToSend.append('recipientName', formData.recipientName);
       formDataToSend.append('recipientPhone', formData.recipientPhone);
       formDataToSend.append('recipientWhatsapp', formData.recipientWhatsapp || formData.recipientPhone);
-      formDataToSend.append('description', formData.description);
+      formDataToSend.append('description', formData.description || '');
       formDataToSend.append('weight', formData.weight || '0');
       formDataToSend.append('price', formData.price || '0');
       
@@ -151,12 +160,61 @@ export default function NewPackageModal({
         formDataToSend.append('photo', photo);
       }
 
-      const response = await fetch('/api/driver/packages/activate', {
-        method: 'POST',
-        body: formDataToSend
+      // Log FormData contents
+      console.log('[MODAL] FormData entries:');
+      formDataToSend.forEach((value, key) => {
+        if (value instanceof File) {
+          console.log(`  ${key}: File(${value.name}, ${value.size} bytes, ${value.type})`);
+        } else {
+          console.log(`  ${key}: ${value}`);
+        }
       });
 
-      const result = await response.json();
+      console.log('[MODAL] Sending request to /api/driver/packages/activate...');
+      
+      // Add timeout with AbortController
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.log('[MODAL] Request timeout - aborting');
+        controller.abort();
+      }, 60000); // 60 seconds timeout
+      
+      let response;
+      try {
+        response = await fetch('/api/driver/packages/activate', {
+          method: 'POST',
+          body: formDataToSend,
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        if (fetchError.name === 'AbortError') {
+          console.error('[MODAL] Request was aborted due to timeout');
+          toast.error('La requête a pris trop de temps. Veuillez réessayer.');
+        } else {
+          throw fetchError;
+        }
+        return;
+      }
+
+      console.log('[MODAL] Response status:', response.status);
+      console.log('[MODAL] Response OK:', response.ok);
+
+      // First get the text to see what we're receiving
+      const responseText = await response.text();
+      console.log('[MODAL] Response text (first 500 chars):', responseText.substring(0, 500));
+      
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('[MODAL] Failed to parse JSON:', parseError);
+        toast.error('Erreur de réponse du serveur');
+        return;
+      }
+      
+      console.log('[MODAL] Response data:', result);
       
       if (result.success) {
         setPickupCode(result.pickupCode);
@@ -166,9 +224,12 @@ export default function NewPackageModal({
       } else {
         toast.error(result.error || 'Erreur lors de l\'activation');
       }
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error('Erreur de connexion');
+    } catch (error: any) {
+      console.error('[MODAL] Network error:', error);
+      console.error('[MODAL] Error name:', error?.name);
+      console.error('[MODAL] Error message:', error?.message);
+      const errorMsg = error?.message || 'Erreur de connexion. Vérifiez votre connexion internet.';
+      toast.error(`Erreur: ${errorMsg}`);
     } finally {
       setLoading(false);
     }

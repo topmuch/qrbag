@@ -11,8 +11,8 @@ export async function GET(
     const batch = await db.qRBatch.findUnique({
       where: { id },
       include: {
-        company: true,
-        packages: {
+        Company: true,
+        Package: {
           orderBy: { createdAt: 'desc' },
           take: 100,
         },
@@ -33,8 +33,11 @@ export async function GET(
       _count: true,
     });
 
+    // Transform to match frontend expectations
     return NextResponse.json({
       ...batch,
+      company: batch.Company,
+      packages: batch.Package,
       statusCounts: statusCounts.reduce((acc, curr) => {
         acc[curr.status] = curr._count;
         return acc;

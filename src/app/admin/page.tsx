@@ -8,7 +8,7 @@ import {
   Plus, Eye, Wand2, ChevronLeft, ChevronRight, Truck,
   CheckCircle2, Clock, TestTube, DollarSign, BarChart3, Activity,
   Search, Filter, Download, FileText, Calendar, Menu, X,
-  AlertTriangle, MapPin, Phone, User
+  AlertTriangle, MapPin, Phone, User, Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +16,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { toast, Toaster } from 'sonner';
 
 // Modals
 import CreateCompanyModal from '@/components/admin/CreateCompanyModal';
@@ -23,6 +24,8 @@ import GenerateQRModal from '@/components/admin/GenerateQRModal';
 import QRBatchDetailsModal from '@/components/admin/QRBatchDetailsModal';
 import SettingsModal from '@/components/admin/SettingsModal';
 import CompanyDetailsModal from '@/components/admin/CompanyDetailsModal';
+import BackupSection from '@/components/admin/BackupSection';
+import QRCodeManagement from '@/components/admin/QRCodeManagement';
 
 interface DashboardData {
   stats: {
@@ -84,6 +87,10 @@ export default function SuperAdminDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
   
+  // Report filter state
+  const [reportPeriod, setReportPeriod] = useState<'month' | 'quarter' | 'year'>('month');
+  const [exportingReport, setExportingReport] = useState(false);
+  
   // Modal states
   const [showCreateCompany, setShowCreateCompany] = useState(false);
   const [showGenerateQR, setShowGenerateQR] = useState(false);
@@ -115,6 +122,81 @@ export default function SuperAdminDashboard() {
     setActiveNav(navId);
     if (navId === 'settings') {
       setShowSettings(true);
+    }
+  };
+
+  // Export report function
+  const exportReport = async () => {
+    if (!data) return;
+    
+    setExportingReport(true);
+    try {
+      // Get period label
+      const periodLabel = reportPeriod === 'month' ? 'Ce mois' : 
+                          reportPeriod === 'quarter' ? 'Ce trimestre' : 'Cette année';
+      
+      // Create CSV content
+      const headers = [
+        'Rapport QRBag',
+        `Période: ${periodLabel}`,
+        `Généré le: ${new Date().toLocaleDateString('fr-FR')}`,
+        ''
+      ];
+      
+      // Statistics section
+      const statsHeaders = ['STATISTIQUES GÉNÉRALES', ''];
+      const statsRows = [
+        ['Compagnies actives', data.stats.activeCompanies],
+        ['Total bus', data.stats.totalBuses],
+        ['Bus en route', data.stats.busesInRoute],
+        ['Colis activés', data.stats.activatedStickers],
+        ['Colis en transit', data.stats.inTransitPackages],
+        ['Colis livrés', data.stats.deliveredPackages],
+        ['Revenus mensuels (FCFA)', data.stats.monthlyRevenue],
+        ['Revenus abonnements (FCFA)', data.stats.subscriptionRevenue],
+        ['Revenus stickers (FCFA)', data.stats.stickerRevenue],
+        ['Taux d\'activation', `${activationRate}%`],
+      ];
+      
+      // Companies section
+      const companiesHeader = ['', ''];
+      const companiesTitles = ['ENTREPRISES', 'Bus', 'Chauffeurs', 'Revenus (FCFA)'];
+      const companiesRows = data.companies.map((c: any) => [
+        c.name,
+        c.busesCount,
+        c.driversCount,
+        c.revenue
+      ]);
+      
+      // Build CSV
+      const csvContent = [
+        ...headers,
+        '',
+        ...statsHeaders,
+        ...statsRows.map(r => r.join(',')),
+        '',
+        ...companiesHeader,
+        companiesTitles.join(','),
+        ...companiesRows.map(r => r.join(',')),
+      ].join('\n');
+      
+      // Download file
+      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `rapport_qrbag_${reportPeriod}_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      toast.success('Rapport exporté avec succès!');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Erreur lors de l\'export du rapport');
+    } finally {
+      setExportingReport(false);
     }
   };
 
@@ -598,124 +680,10 @@ export default function SuperAdminDashboard() {
             {/* QR CODES PAGE */}
             {activeNav === 'qrcodes' && (
               <motion.div key="qrcodes" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
-                {/* Stats Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <Card className="bg-white shadow-sm border border-gray-100">
-                    <CardContent className="p-5 text-center">
-                      <p className="text-3xl font-bold text-[#FF9F40]">{data.stats.totalStickers}</p>
-                      <p className="text-sm text-gray-500">QR générés</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-white shadow-sm border border-gray-100">
-                    <CardContent className="p-5 text-center">
-                      <p className="text-3xl font-bold text-[#58D68D]">{data.stats.activatedStickers}</p>
-                      <p className="text-sm text-gray-500">Activés</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-white shadow-sm border border-gray-100">
-                    <CardContent className="p-5 text-center">
-                      <p className="text-3xl font-bold text-[#5DADE2]">{data.stats.totalStickers - data.stats.activatedStickers}</p>
-                      <p className="text-sm text-gray-500">En stock</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-white shadow-sm border border-gray-100">
-                    <CardContent className="p-5 text-center">
-                      <p className="text-3xl font-bold text-[#9B59B6]">{activationRate}%</p>
-                      <p className="text-sm text-gray-500">Taux activation</p>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Test QR Codes Section */}
-                <Card className="bg-gradient-to-r from-[#58D68D]/10 to-[#27AE60]/10 border border-[#58D68D]/20">
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                      <TestTube className="w-5 h-5 text-[#58D68D]" />
-                      <h3 className="text-lg font-semibold text-gray-900">QR Codes de Test</h3>
-                      <Badge className="bg-[#58D68D]/20 text-[#27AE60]">Pour développement</Badge>
-                    </div>
-                    <p className="text-gray-600 mb-4">Utilisez ces codes prédéfinis pour tester le système sans créer de nouvelles données.</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                      {data.testQRCodes?.slice(0, 8).map((qr: any) => (
-                        <div key={qr.id} className="bg-white rounded-lg p-3 border border-gray-200 flex items-center justify-between">
-                          <div>
-                            <p className="text-xs font-mono text-gray-900">{qr.qrCode}</p>
-                            <p className="text-xs text-gray-500">{qr.senderName || 'Non activé'}</p>
-                          </div>
-                          <Badge className={cn(
-                            "text-xs",
-                            qr.status === 'NON_ACTIVE' ? 'bg-gray-100 text-gray-600' :
-                            qr.status === 'ACTIVE' ? 'bg-green-100 text-green-700' :
-                            qr.status === 'IN_TRANSIT' ? 'bg-blue-100 text-blue-700' :
-                            'bg-purple-100 text-purple-700'
-                          )}>
-                            {qr.status === 'NON_ACTIVE' ? 'Non activé' :
-                             qr.status === 'ACTIVE' ? 'Actif' :
-                             qr.status === 'IN_TRANSIT' ? 'En transit' : 'Livré'}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Generate Button */}
-                <Card className="bg-gradient-to-r from-[#FF9F40]/10 to-[#FF6B00]/10 border border-[#FF9F40]/20">
-                  <CardContent className="p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="w-14 h-14 rounded-xl bg-[#FF9F40] flex items-center justify-center">
-                        <Wand2 className="w-7 h-7 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900">Générer de nouveaux QR Codes</h3>
-                        <p className="text-gray-600">Créez un nouveau lot de stickers pour les colis</p>
-                      </div>
-                    </div>
-                    <Button className="bg-[#FF9F40] hover:bg-[#E67E00] text-white w-full sm:w-auto" onClick={() => setShowGenerateQR(true)}>
-                      <Plus className="w-4 h-4 mr-2" />Générer
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                {/* Search */}
-                <div className="flex gap-4 items-center">
-                  <div className="relative flex-1 max-w-md">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <Input placeholder="Rechercher un lot..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 border-gray-200" />
-                  </div>
-                </div>
-
-                {/* QR Batches List */}
-                <div className="space-y-3">
-                  {filteredBatches.map((batch: any) => (
-                    <Card key={batch.id} className="bg-white shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setSelectedBatchId(batch.id)}>
-                      <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-lg bg-[#FF9F40]/10 flex items-center justify-center">
-                            <QrCode className="w-5 h-5 text-[#FF9F40]" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-900">{batch.batchCode}</p>
-                            <p className="text-sm text-gray-500">{batch.company?.name || 'N/A'}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4 sm:gap-6 w-full sm:w-auto">
-                          <div className="text-right flex-1 sm:flex-none">
-                            <p className="text-sm text-gray-500">{batch.quantity} stickers</p>
-                            <p className="text-sm font-medium text-gray-900">{batch.activatedCount} activés</p>
-                          </div>
-                          <div className="w-20 sm:w-24">
-                            <Progress value={(batch.activatedCount / batch.quantity) * 100} className="h-2" />
-                          </div>
-                          <Badge className={batch.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}>
-                            {batch.status === 'ACTIVE' ? 'Actif' : batch.status}
-                          </Badge>
-                          <Eye className="w-5 h-5 text-gray-400 hidden sm:block" />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                <QRCodeManagement 
+                  companies={data.companies} 
+                  onDataChange={fetchData}
+                />
               </motion.div>
             )}
 
@@ -780,15 +748,71 @@ export default function SuperAdminDashboard() {
             {/* REPORTS PAGE */}
             {activeNav === 'reports' && (
               <motion.div key="reports" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div className="flex gap-2">
-                    <Button variant="outline" className="border-gray-200">Ce mois</Button>
-                    <Button variant="ghost">Ce trimestre</Button>
-                    <Button variant="ghost">Cette année</Button>
+                    <Button 
+                      variant={reportPeriod === 'month' ? 'default' : 'ghost'}
+                      className={reportPeriod === 'month' ? 'bg-[#FF9F40] hover:bg-[#E67E00] text-white' : ''}
+                      onClick={() => setReportPeriod('month')}
+                    >
+                      Ce mois
+                    </Button>
+                    <Button 
+                      variant={reportPeriod === 'quarter' ? 'default' : 'ghost'}
+                      className={reportPeriod === 'quarter' ? 'bg-[#FF9F40] hover:bg-[#E67E00] text-white' : ''}
+                      onClick={() => setReportPeriod('quarter')}
+                    >
+                      Ce trimestre
+                    </Button>
+                    <Button 
+                      variant={reportPeriod === 'year' ? 'default' : 'ghost'}
+                      className={reportPeriod === 'year' ? 'bg-[#FF9F40] hover:bg-[#E67E00] text-white' : ''}
+                      onClick={() => setReportPeriod('year')}
+                    >
+                      Cette année
+                    </Button>
                   </div>
-                  <Button variant="outline" className="border-gray-200">
-                    <Download className="w-4 h-4 mr-2" />Exporter
+                  <Button 
+                    variant="outline" 
+                    className="border-gray-200"
+                    onClick={exportReport}
+                    disabled={exportingReport}
+                  >
+                    {exportingReport ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4 mr-2" />
+                    )}
+                    Exporter
                   </Button>
+                </div>
+
+                {/* Summary Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Card className="bg-white shadow-sm border border-gray-100">
+                    <CardContent className="p-4 text-center">
+                      <p className="text-2xl font-bold text-[#FF9F40]">{data.stats.activeCompanies}</p>
+                      <p className="text-sm text-gray-500">Compagnies actives</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-white shadow-sm border border-gray-100">
+                    <CardContent className="p-4 text-center">
+                      <p className="text-2xl font-bold text-[#58D68D]">{data.stats.activatedStickers}</p>
+                      <p className="text-sm text-gray-500">Colis activés</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-white shadow-sm border border-gray-100">
+                    <CardContent className="p-4 text-center">
+                      <p className="text-2xl font-bold text-[#5DADE2]">{data.stats.inTransitPackages}</p>
+                      <p className="text-sm text-gray-500">En transit</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-white shadow-sm border border-gray-100">
+                    <CardContent className="p-4 text-center">
+                      <p className="text-2xl font-bold text-[#9B59B6]">{(data.stats.monthlyRevenue / 1000).toFixed(1)}k</p>
+                      <p className="text-sm text-gray-500">Revenus (FCFA)</p>
+                    </CardContent>
+                  </Card>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -814,14 +838,14 @@ export default function SuperAdminDashboard() {
                     <CardContent className="p-6">
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">Performance des compagnies</h3>
                       <div className="space-y-4">
-                        {data.companies.map((company: any) => (
+                        {data.companies.slice(0, 6).map((company: any) => (
                           <div key={company.id} className="flex items-center gap-4">
                             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#FF9F40] to-[#FF6B00] flex items-center justify-center text-white text-xs font-bold">
                               {company.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
                             </div>
                             <div className="flex-1">
                               <p className="text-sm font-medium text-gray-900">{company.name}</p>
-                              <Progress value={company.revenue / 1000} className="h-2 mt-1" />
+                              <Progress value={Math.min(company.revenue / 1000, 100)} className="h-2 mt-1" />
                             </div>
                             <span className="text-sm font-bold text-gray-900">{company.revenue.toLocaleString()} FCFA</span>
                           </div>
@@ -836,6 +860,14 @@ export default function SuperAdminDashboard() {
             {/* SETTINGS PAGE */}
             {activeNav === 'settings' && (
               <motion.div key="settings" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
+                {/* Backup Section */}
+                <Card className="bg-white shadow-sm border border-gray-100">
+                  <CardContent className="p-6">
+                    <BackupSection onDataChanged={fetchData} />
+                  </CardContent>
+                </Card>
+
+                {/* System Settings */}
                 <Card className="bg-white shadow-sm border border-gray-100">
                   <CardContent className="p-6">
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">Paramètres du système</h3>
@@ -857,6 +889,7 @@ export default function SuperAdminDashboard() {
       <QRBatchDetailsModal isOpen={!!selectedBatchId} onClose={() => setSelectedBatchId(null)} batchId={selectedBatchId} />
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
       <CompanyDetailsModal isOpen={!!selectedCompanyId} onClose={() => setSelectedCompanyId(null)} companyId={selectedCompanyId} />
+      <Toaster position="top-center" richColors />
     </div>
   );
 }

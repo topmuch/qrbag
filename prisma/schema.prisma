@@ -72,6 +72,9 @@ model Package {
   price             Float?
   photo             String?
   activatedAt       DateTime?
+  validUntil        DateTime?   // Date d'expiration (activatedAt + 10 jours)
+  deliveredAt       DateTime?   // Date de livraison
+  expiredAt         DateTime?   // Date d'expiration effective
   companyId         String?
   tripId            String?
   batchId           String?
@@ -87,25 +90,43 @@ model QRBatch {
   batchCode      String    @unique
   quantity       Int
   activatedCount Int       @default(0)
+  expiredCount   Int       @default(0)    // Nombre de QR codes expirés
   status         String    @default("PENDING")
   companyId      String
+  notes          String?                   // Notes optionnelles
   createdAt      DateTime  @default(now())
   Package        Package[]
   Company        Company   @relation(fields: [companyId], references: [id])
 }
 
 model Route {
-  id            String   @id
+  id            String           @id
   name          String
   origin        String
   destination   String
   distance      Float?
   estimatedTime Int?
   companyId     String
-  createdAt     DateTime @default(now())
+  createdAt     DateTime         @default(now())
   updatedAt     DateTime
-  Company       Company  @relation(fields: [companyId], references: [id])
+  Company       Company          @relation(fields: [companyId], references: [id])
   Trip          Trip[]
+  Checkpoints   RouteCheckpoint[]
+}
+
+model RouteCheckpoint {
+  id                String   @id
+  name              String                // Nom du checkpoint (ex: "Station Total Yamoussoukro")
+  type              String                // DEPART, PAUSE, ARRIVAL
+  order             Int                   // Ordre dans la route
+  recommendedDuration Int?                // Durée recommandée en minutes (pour les pauses)
+  latitude          Float?
+  longitude         Float?
+  notes             String?
+  routeId           String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime
+  Route             Route    @relation(fields: [routeId], references: [id])
 }
 
 model Settings {

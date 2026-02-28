@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { randomUUID } from 'crypto';
 
 // GET - List all companies
 export async function GET() {
@@ -17,7 +18,8 @@ export async function GET() {
     });
 
     const formattedCompanies = companies.map(company => {
-      const subscription = company.Subscription?.[0];
+      // Subscription is a single object (one-to-one relation), not an array
+      const subscription = company.Subscription;
       const totalStickers = company.QRBatch.reduce((acc, b) => acc + b.quantity, 0);
       const activatedStickers = subscription?.activatedStickers || 0;
       
@@ -120,8 +122,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Create company with subscription
+    const companyId = randomUUID();
     const company = await db.company.create({
       data: {
+        id: companyId,
         name,
         email,
         phone: phone || null,
@@ -129,15 +133,18 @@ export async function POST(request: NextRequest) {
         city: city || null,
         country,
         isActive: true,
+        updatedAt: new Date(),
         Subscription: {
           create: {
+            id: randomUUID(),
             planType: planType,
             monthlyFee,
             stickerFee: settings.stickerPrice,
             activatedStickers: 0,
             startDate: new Date(),
             endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
-            status: 'ACTIVE'
+            status: 'ACTIVE',
+            updatedAt: new Date()
           }
         }
       },
